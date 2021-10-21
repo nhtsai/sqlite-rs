@@ -30,6 +30,7 @@ struct Table {
     pages: [*mut u8; 100],
 }
 
+/// Main REPL that processes commands and statements from user input
 fn main() {
     let mut cmd: String = String::new(); // consider String::with_capacity()
     let mut table: Table = Table {
@@ -77,12 +78,22 @@ fn main() {
     }
 }
 
+/// Prints the prompt for user input
 fn print_prompt() {
     // immediately flush prompt to stdout, avoids line-buffering
     print!("rs-sqlite> ");
     io::stdout().flush().unwrap();
 }
 
+/// Reads input command from stdin
+/// 
+/// # Arguments
+/// 
+/// * `cmd` - A mutable String that will hold the input command
+/// 
+/// # Returns
+/// 
+/// A String of the parsed input command
 fn read_input(mut cmd: String) -> String {
     cmd.clear();
     io::stdin()
@@ -91,6 +102,15 @@ fn read_input(mut cmd: String) -> String {
     cmd.trim().to_string()
 }
 
+/// Performs meta commands
+/// 
+/// # Arguments
+/// 
+/// * `cmd` - A reference to a String that specifies the meta command
+/// 
+/// # Returns
+/// 
+/// A Result enum of either the String reference or a MetaCommandError
 fn do_meta_command(cmd: &String) -> Result<&String, error::MetaCommandError> {
     match cmd.as_str() {
         ".exit" => process::exit(0),
