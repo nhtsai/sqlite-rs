@@ -1,10 +1,24 @@
-use std::fmt;
+// use std::fmt;
 use std::io::{self, prelude::*};
 use std::process;
 
-mod error;
+// mod error;
+mod table;
+use table::{Row, Table};
 
-const MAX_TABLE_ROWS: u32 = 100;
+enum MetaCommandResult {
+    Success,
+    UnrecognizedCommand,
+}
+
+enum PrepareResult {
+    Success,
+    UnrecognizedStatement
+}
+
+enum ExecuteResult {
+    Success,
+}
 
 #[derive(Debug)]
 enum Statement {
@@ -12,71 +26,6 @@ enum Statement {
     Insert(Row),
 }
 
-#[derive(Debug)]
-struct Row {
-    id: u32,
-    username: String,
-    email: String,
-}
-
-impl fmt::Display for Row {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {}, {})", self.id, self.username, self.email)
-    }
-}
-
-struct Table {
-    num_rows: u32,
-    pages: [*mut u8; 100],
-}
-
-/// Main REPL that processes commands and statements from user input
-fn main() {
-    let mut cmd: String = String::new(); // consider String::with_capacity()
-    let mut table: Table = Table {
-        num_rows: 0,
-        pages: [&mut 0; 100],
-    };
-    loop {
-        print_prompt();
-
-        // Read in command
-        cmd = read_input(cmd);
-
-        // Handle meta commands
-        let first_char: char = cmd.chars().next().unwrap();
-        if first_char == '.' {
-            match do_meta_command(&cmd) {
-                Ok(cmd) => {
-                    println!("{} processed.", cmd);
-                }
-                Err(error) => {
-                    println!("{}", error);
-                }
-            }
-            continue;
-        }
-
-        // Handle statements
-        let statement = match get_statement(&cmd) {
-            Ok(s) => s,
-            Err(error) => {
-                println!("{}", error);
-                continue;
-            }
-        };
-        println!("{:?}", statement);
-
-        match execute_statement(&statement, &mut table) {
-            Ok(_) => {
-                println!("Executed.");
-            }
-            Err(error) => {
-                println!("{}", error);
-            }
-        };
-    }
-}
 
 /// Prints the prompt for user input
 fn print_prompt() {
@@ -89,17 +38,15 @@ fn print_prompt() {
 /// 
 /// # Arguments
 /// 
-/// * `cmd` - A mutable String that will hold the input command
+/// * `input` - A mutable String that will hold the input command
 /// 
 /// # Returns
 /// 
 /// A String of the parsed input command
-fn read_input(mut cmd: String) -> String {
-    cmd.clear();
-    io::stdin()
-        .read_line(&mut cmd)
-        .expect("Failed to read command.");
-    cmd.trim().to_string()
+fn read_input(mut input: String) -> String {
+    input.clear();
+    io::stdin().read_line(&mut input).expect("Failed to read input.");
+    input.trim_end().to_string()
 }
 
 /// Performs meta commands
@@ -111,10 +58,14 @@ fn read_input(mut cmd: String) -> String {
 /// # Returns
 /// 
 /// A Result enum of either the String reference or a MetaCommandError
-fn do_meta_command(cmd: &String) -> Result<&String, error::MetaCommandError> {
+fn do_meta_command(cmd: &String) -> MetaCommandResult {
     match cmd.as_str() {
-        ".exit" => process::exit(0),
-        _ => Err(error::MetaCommandError::new(cmd)),
+        ".exit" => {
+            process::exit(0);
+        }
+        _ => {
+            MetaCommandResult::UnrecognizedCommand
+        }
     }
 }
 
@@ -127,42 +78,41 @@ fn do_meta_command(cmd: &String) -> Result<&String, error::MetaCommandError> {
 /// # Returns
 ///
 /// A Result enum containing either a Statement or StatementError
-fn get_statement(cmd: &String) -> Result<Statement, error::StatementError> {
-    if cmd.len() < 6 {
-        return Err(error::StatementError::new(cmd));
+fn prepare_statement(cmd: &String) -> Result<Statement, PrepareResult> {
+
+
+    if cmd.starts_with("select") {
+        return Ok(Statement::Select);
     }
 
-    match &cmd.to_lowercase()[0..6] {
-        "insert" => {
-            // extract statement input
-            let split: Vec<&str> = cmd.split_whitespace().collect();
+    if cmd.starts_with("insert") {
+        // extract statement input
+        let split: Vec<&str> = cmd.split_whitespace().collect();
 
-            if split.len() != 4 {
-                return Err(error::StatementError::new(cmd));
-            }
-
-            // parse row id
-            let row_id: u32 = match split[1].parse() {
-                Ok(row_id) => row_id,
-                Err(_) => {
-                    return Err(error::StatementError::new(cmd));
-                }
-            };
-
-            // parse row username
-            let row_username: String = String::from(split[2]);
-            let row_email: String = String::from(split[3]);
-            let row: Row = Row {
-                id: row_id,
-                username: row_username,
-                email: row_email,
-            };
-
-            Ok(Statement::Insert(row))
+        if split.len() != 4 {
+            return Err(PrepareResult::UnrecognizedStatement);
         }
-        "select" => Ok(Statement::Select),
-        _ => Err(error::StatementError::new(cmd)),
+
+        // parse row id
+        let row_id: u32 = match split[1].parse() {
+            Ok(row_id) => row_id,
+            Err(_) => {
+                return Err(PrepareResult::UnrecognizedStatement);
+            }
+        };
+
+        // parse row username
+        let row_username: String = String::from(split[2]);
+        let row_email: String = String::from(split[3]);
+        let row: Row = Row {
+            id: row_id,
+            username: row_username,
+            email: row_email,
+        };
+
+        return Ok(Statement::Insert(row))
     }
+    return Err(PrepareResult::UnrecognizedStatement);
 }
 
 /// Executes a statement on the table
@@ -175,22 +125,60 @@ fn get_statement(cmd: &String) -> Result<Statement, error::StatementError> {
 /// # Returns
 ///
 /// A Result enum containing either () or an ExecutionError
-fn execute_statement(
-    statement: &Statement,
-    table: &mut Table,
-) -> Result<(), error::ExecutionError> {
-    if table.num_rows > MAX_TABLE_ROWS {
-        return Err(error::ExecutionError);
-    }
-
+fn execute_statement(statement: &Statement, table: &mut Table) -> ExecuteResult {
     match statement {
-        Statement::Insert(_) => {
-            println!("This is where we would do an insert.");
-            Ok(())
-        }
         Statement::Select => {
             println!("This is where we would do a select.");
-            Ok(())
+            ExecuteResult::Success
         }
+        Statement::Insert(_) => {
+            println!("This is where we would do an insert.");
+            ExecuteResult::Success
+        }
+    }
+}
+
+/// Main REPL that processes commands and statements from user input
+fn main() {
+    let mut input_buffer: String = String::new(); // consider String::with_capacity()
+    let mut table: Table = Table {
+        num_rows: 0,
+        pages: [&mut 0; 100],
+    };
+
+    loop {
+        print_prompt();
+
+        // Read input as command
+        input_buffer = read_input(input_buffer);
+
+        // Handle meta commands
+        if input_buffer.starts_with(".") {
+            match do_meta_command(&input_buffer) {
+                MetaCommandResult::Success => {
+                    println!("{} processed.", input_buffer);
+                }
+                MetaCommandResult::UnrecognizedCommand => {
+                    println!("Unrecognized command: {}", input_buffer);
+                }
+            }
+            continue;
+        }
+
+        // Handle statements
+        let statement = match prepare_statement(&input_buffer) {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Statement error: {}", input_buffer);
+                continue;
+            }
+        };
+        println!("{:?}", statement);
+
+        match execute_statement(&statement, &mut table) {
+            ExecuteResult::Success => {
+                println!("Executed.");
+            }
+        };
     }
 }
