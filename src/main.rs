@@ -13,7 +13,7 @@ enum MetaCommandResult {
 
 enum PrepareResult {
     Success,
-    UnrecognizedStatement
+    UnrecognizedStatement,
 }
 
 enum ExecuteResult {
@@ -26,7 +26,6 @@ enum Statement {
     Insert(Row),
 }
 
-
 /// Prints the prompt for user input
 fn print_prompt() {
     // immediately flush prompt to stdout, avoids line-buffering
@@ -35,37 +34,37 @@ fn print_prompt() {
 }
 
 /// Reads input command from stdin
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `input` - A mutable String that will hold the input command
-/// 
+///
 /// # Returns
-/// 
+///
 /// A String of the parsed input command
 fn read_input(mut input: String) -> String {
     input.clear();
-    io::stdin().read_line(&mut input).expect("Failed to read input.");
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read input.");
     input.trim_end().to_string()
 }
 
 /// Performs meta commands
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `cmd` - A reference to a String that specifies the meta command
-/// 
+///
 /// # Returns
-/// 
+///
 /// A Result enum of either the String reference or a MetaCommandError
 fn do_meta_command(cmd: &String) -> MetaCommandResult {
     match cmd.as_str() {
         ".exit" => {
             process::exit(0);
         }
-        _ => {
-            MetaCommandResult::UnrecognizedCommand
-        }
+        _ => MetaCommandResult::UnrecognizedCommand,
     }
 }
 
@@ -79,8 +78,6 @@ fn do_meta_command(cmd: &String) -> MetaCommandResult {
 ///
 /// A Result enum containing either a Statement or StatementError
 fn prepare_statement(cmd: &String) -> Result<Statement, PrepareResult> {
-
-
     if cmd.starts_with("select") {
         return Ok(Statement::Select);
     }
@@ -110,7 +107,7 @@ fn prepare_statement(cmd: &String) -> Result<Statement, PrepareResult> {
             email: row_email,
         };
 
-        return Ok(Statement::Insert(row))
+        return Ok(Statement::Insert(row));
     }
     return Err(PrepareResult::UnrecognizedStatement);
 }
@@ -159,7 +156,7 @@ fn main() {
                     println!("{} processed.", input_buffer);
                 }
                 MetaCommandResult::UnrecognizedCommand => {
-                    println!("Unrecognized command: {}", input_buffer);
+                    println!("Unrecognized meta command: {}", input_buffer);
                 }
             }
             continue;
@@ -169,7 +166,7 @@ fn main() {
         let statement = match prepare_statement(&input_buffer) {
             Ok(s) => s,
             Err(_) => {
-                println!("Statement error: {}", input_buffer);
+                println!("Invalid statement: {}", input_buffer);
                 continue;
             }
         };
