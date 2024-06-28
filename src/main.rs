@@ -1,48 +1,8 @@
-use std::error::Error;
-use std::fmt;
 use std::io::{self, Write};
 
-#[derive(fmt::Debug)]
-struct MetaCommandError {
-    details: String,
-}
+mod error;
 
-impl MetaCommandError {
-    fn new(msg: &str) -> MetaCommandError {
-        MetaCommandError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl Error for MetaCommandError {}
-
-impl fmt::Display for MetaCommandError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unrecognized command `{}`.", self.details)
-    }
-}
-
-#[derive(Debug)]
-struct InvalidStatementError {
-    details: String,
-}
-
-impl InvalidStatementError {
-    fn new(msg: &str) -> InvalidStatementError {
-        InvalidStatementError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl Error for InvalidStatementError {}
-
-impl fmt::Display for InvalidStatementError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unrecognized keyword at start of `{}`.", self.details)
-    }
-}
+use error::SQLiteError;
 
 fn main() {
     let mut buffer = String::new();
@@ -77,9 +37,9 @@ fn main() {
     }
 }
 
-fn do_meta_command(command: &str) -> Result<(), MetaCommandError> {
+fn do_meta_command(command: &str) -> Result<(), SQLiteError> {
     match command {
-        _ => Err(MetaCommandError::new(command)),
+        _ => Err(SQLiteError::InvalidCommand(command.to_string())),
     }
 }
 
@@ -89,11 +49,11 @@ enum Statement {
     Insert,
 }
 
-fn prepare_statement(command: &str) -> Result<Statement, InvalidStatementError> {
+fn prepare_statement(command: &str) -> Result<Statement, SQLiteError> {
     match command {
         command if command.to_lowercase().starts_with("insert") => Ok(Statement::Insert),
         command if command.to_lowercase().starts_with("select") => Ok(Statement::Select),
-        _ => Err(InvalidStatementError::new(command)),
+        _ => Err(SQLiteError::InvalidStatement(command.to_string())),
     }
 }
 
